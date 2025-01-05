@@ -22,30 +22,28 @@ if [ ! -d "${WORK_DIR}" ]; then
 fi
 ######## FUNCTIONS ##############
 # logler
-function log()
-{
+function log() {
     local input="$*"
     if [ ! -d "${LOG_DIR}" ]; then
         mkdir -p "${LOG_DIR}"
     fi
     case "${LOG_LVL}" in
-        3)
-            if [ ! -z "${input}" ]; then
-                echo "${input}" | tee -a "${LOG_FILE}"
-            fi
-            ;;
-        2)
-            if [ ! -z "${input}" ]; then
-                echo "${input}" >> "${LOG_FILE}"
-            fi
-            ;;
-        1)
-            if [ ! -z "${input}" ]; then
-                echo "${input}"
-            fi
-            ;;
-        *)
-            ;;
+    3)
+        if [ ! -z "${input}" ]; then
+            echo "${input}" | tee -a "${LOG_FILE}"
+        fi
+        ;;
+    2)
+        if [ ! -z "${input}" ]; then
+            echo "${input}" >>"${LOG_FILE}"
+        fi
+        ;;
+    1)
+        if [ ! -z "${input}" ]; then
+            echo "${input}"
+        fi
+        ;;
+    *) ;;
     esac
 }
 # iniget config-file section option
@@ -61,9 +59,11 @@ function iniget {
     $xtrace
 }
 # read config
-function read_config()
-{
-    if [ ! -f "${CFG_FILE}" ]; then echo "Config missed!"; exit 1; fi
+function read_config() {
+    if [ ! -f "${CFG_FILE}" ]; then
+        echo "Config missed!"
+        exit 1
+    fi
     local loglvl="$(iniget "${CFG_FILE}" "default" "loglevel")"
     local gerrituser="$(iniget "${CFG_FILE}" "default" "gerrituser")"
     local gerrithost="$(iniget "${CFG_FILE}" "default" "gerrithost")"
@@ -75,7 +75,7 @@ function read_config()
     if [ ! -z "${loglvl}" ]; then
         LOG_LVL="${loglvl}"
     fi
-    if [ -z "${gerrituser}" ] || [ -z "${gerrithost}" ] || [ -z "${gerritport}" ] ; then
+    if [ -z "${gerrituser}" ] || [ -z "${gerrithost}" ] || [ -z "${gerritport}" ]; then
         log "Please make setup proper values for [default]/gerrit[user[host[port] in ${CFG_FILE}!"
         exit 2
     fi
@@ -103,8 +103,7 @@ function read_config()
     CFG["releases"]="${relases}"
 }
 # check gerrit connectivity
-function check_connectivity()
-{
+function check_connectivity() {
     local retval=0
     log "Checking gerrit connection:"
     ${CFG[gerritconstring]} 'gerrit version' 2>/dev/null || retval=$?
@@ -114,15 +113,13 @@ function check_connectivity()
     fi
 }
 # collect data for further processing
-function query_gerrit_for_projects()
-{
+function query_gerrit_for_projects() {
     local branch="${1}"
     local projfilter="${2}"
     local projexclusions="${3}"
     local filter=""
     local exclusions=""
-    for item in ${projfilter}
-    do
+    for item in ${projfilter}; do
         if [ -z "${filter}" ]; then
             filter="${item}/.*$"
         else
@@ -131,8 +128,7 @@ function query_gerrit_for_projects()
     done
     local command="${CFG[gerritconstring]} 2>/dev/null \"gerrit ls-projects -b ${branch}\" | grep -oE \"(${filter})\""
     if [ ! -z "${projexclusions}" ]; then
-        for excl in ${projexclusions}
-        do
+        for excl in ${projexclusions}; do
             if [ -z "${exclusions}" ]; then
                 exclusions="${excl}"
             else
@@ -141,8 +137,7 @@ function query_gerrit_for_projects()
         done
         command="${command} | grep -vE \"(${exclusions})\""
     fi
-    while read line
-    do
+    while read line; do
         if [ ! -z "${line}" ]; then
             PROJECTS=("${PROJECTS[@]}" "${line}")
         fi
@@ -152,11 +147,9 @@ function query_gerrit_for_projects()
     fi
 }
 # fetch projects
-function get_code()
-{
+function get_code() {
     local update_repo_if_exists="${CFG[updatecode]}"
-    for i in $(seq 0 $(( ${#PROJECTS[@]} - 1)));
-    do
+    for i in $(seq 0 $((${#PROJECTS[@]} - 1))); do
         local gerritprojname="${PROJECTS[${i}]}"
         local localprojpath="${WORK_DIR}/${gerritprojname}"
         if [ ! -d "${localprojpath}" ]; then
@@ -194,11 +187,9 @@ function get_code()
     done
 }
 # switch to required branch
-function switch_branch()
-{
+function switch_branch() {
     local branch="${1}"
-    for i in $(seq 0 $(( ${#PROJECTS[@]} - 1)));
-    do
+    for i in $(seq 0 $((${#PROJECTS[@]} - 1))); do
         local gerritprojname="${PROJECTS[${i}]}"
         local localprojpath="${WORK_DIR}/${gerritprojname}"
         log "Switching to '${branch}' for '$gerritprojname'"
@@ -210,14 +201,12 @@ function switch_branch()
     done
 }
 # reset PROJECTS array
-function reset_proj_array()
-{
+function reset_proj_array() {
     unset PROJECTS
 
 }
 #### TODO: add code analysis below
-function analyse()
-{
+function analyse() {
     if [ -z "${CFG[analyser]}" ]; then
         log "WRN: Analyser tool was not set up properly or wasn't found, check values of [default]/analyser[opts] in '${CFG_FILE}'. Skipping run."
         return 1
@@ -227,17 +216,15 @@ function analyse()
     export PATH=$PATH:${add_to_path}
     export LANG=C
     log "Running analyser '${CFG[analyser]}'..."
-    ${CFG[analyser]} ${CFG[analyseropts]} "${WORK_DIR}" >> "${report_file}"
+    ${CFG[analyser]} ${CFG[analyseropts]} "${WORK_DIR}" >>"${report_file}"
     sed -i '/WARNING/d' "${report_file}"
 }
 ####
 # start processing
-function main()
-{
+function main() {
     read_config
     check_connectivity
-    for relname in ${CFG[releases]}
-    do
+    for relname in ${CFG[releases]}; do
         local os_projfilter="$(iniget "${CFG_FILE}" "${relname}" "osprojfitler")"
         local os_projbranch="$(iniget "${CFG_FILE}" "${relname}" "osbranch")"
         local os_proj_exclusion="$(iniget "${CFG_FILE}" "${relname}" "osprojexclusion")"
